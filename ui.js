@@ -213,7 +213,7 @@
   /* ---------------------------------------------------------------- HUD & alerts */
   function chip(label, val, cap, net, cls, tip, frac) {
     const n = net === null ? '' : `<em class="${net >= 0 ? 'pos' : 'neg'}">${sgn(net)}/d</em>`;
-    return `<div class="chip ${cls}" title="${tip}"><div class="cl"><span>${label}</span>${n}</div>` +
+    return `<div class="chip ${cls}" data-k="${label.toLowerCase().replace(/\s+/g, '')}" title="${tip}"><div class="cl"><span>${label}</span>${n}</div>` +
       `<div class="cv">${val}${cap ? `<small> / ${cap}</small>` : ''}</div>` +
       `<div class="bar"><i style="width:${frac}%"></i></div></div>`;
   }
@@ -275,7 +275,7 @@
       return `<button class="card ${ui.placing === k ? 'active' : ''} ${locked ? 'locked' : ''}" data-build="${k}">` +
         `<span class="ico" style="color:${d.color}">${icon(k)}</span>` +
         `<span><b>${d.name}</b><small>${E.describe(k, S.planet).join(' · ')}${locked ? ` · needs crew of ${d.minPop}` : ''}</small></span>` +
-        `<span class="cost"><span class="${shortM ? 'short' : ''}">${d.cost.m} mat</span><br><span class="${shortC ? 'short' : ''}">${d.cost.c} cr</span><br><small class="muted">${d.build}d build</small></span></button>`;
+        `<span class="cost"><span class="${shortM ? 'short' : 'm'}">${d.cost.m} mat</span><br><span class="${shortC ? 'short' : 'c'}">${d.cost.c} cr</span><br><small class="muted">${d.build}d build</small></span></button>`;
     }).join('');
     return `<div class="sect">Modules — build within 2 tiles of an existing module</div>${cards}`;
   }
@@ -288,7 +288,7 @@
       const c = E.CARGO[k], price = E.cargoPrice(S, k, ui.express);
       return `<button class="card" data-order="${k}"><span class="ico" style="font-weight:800">${sym[k]}</span>` +
         `<span><b>${c.name}</b><small>${c.desc}</small></span>` +
-        `<span class="cost"><span class="${S.res.cred < price ? 'short' : ''}">${price} cr</span><br><small class="muted">${E.cargoDelay(S, ui.express)}d</small></span></button>`;
+        `<span class="cost"><span class="${S.res.cred < price ? 'short' : 'c'}">${price} cr</span><br><small class="muted">${E.cargoDelay(S, ui.express)}d</small></span></button>`;
     }).join('');
     const q = S.queue.slice().sort((a, b) => a.arrive - b.arrive).map(x =>
       `<div class="kv"><span>${E.CARGO[x.key].name}${x.express ? ' (express)' : ''}</span><b>day ${x.arrive} (${x.arrive - S.day}d)</b></div>`).join('') || '<div class="kv"><span>Nothing in transit</span></div>';
