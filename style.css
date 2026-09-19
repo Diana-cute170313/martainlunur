@@ -134,10 +134,10 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; al
 #mapwrap {
   position: relative; border-radius: 14px; overflow: hidden; padding: 6px;
   border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
-  background: #06081a;
+  background: var(--gridline, #06081a);
   box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 22%, transparent);
 }
-#map { display: grid; grid-template-columns: repeat(14, 1fr); gap: 2px; aspect-ratio: 14 / 9; }
+#map { display: grid; grid-template-columns: repeat(14, 1fr); gap: var(--gap, 2px); aspect-ratio: 14 / 9; }
 .tile {
   position: relative; border-radius: 5px; overflow: hidden; cursor: crosshair;
   container-type: inline-size; user-select: none;
@@ -206,6 +206,15 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; al
 .tabs button[data-tab=cargo] { --t: #ffb347; }
 .tabs button[data-tab=colony] { --t: #59f0a0; }
 .tabs button[data-tab=log] { --t: #d59bff; }
+.tabs button[data-tab=look] { --t: #ff7ac0; }
+.lookrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 4px; font-size: 13px; }
+.lookrow output { display: inline-block; min-width: 30px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+input[type=color] { width: 52px; height: 30px; padding: 2px; background: #0006; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+input[type=range] { accent-color: var(--accent); width: 110px; vertical-align: middle; }
+.swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sw { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px; font-size: 12px; text-align: left; }
+.sw:hover { border-color: var(--accent); }
+.sw i { display: block; height: 22px; border-radius: 5px; margin-bottom: 4px; border: 1px solid #0006; background: linear-gradient(90deg, var(--g) 0 50%, var(--r) 50% 78%, var(--l) 78%); }
 .tabs button:hover { color: var(--text); }
 .tabs button.on { color: var(--t); border-bottom-color: var(--t); background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--t) 16%, transparent)); }
 #inspector { border-bottom: 1px solid var(--line); }

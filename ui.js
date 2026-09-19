@@ -51,6 +51,73 @@
     return s;
   }
 
+  /* ---------------------------------------------------------------- customizable grid colors */
+  const LOOK_KEY = 'outpost.look.v1';
+  const LOOK_DEFAULT = { ground: null, rock: null, line: null, gap: 2 };
+  const PRESETS = {
+    ocean:    { n: 'Ocean',    ground: '#3f8fb5', rock: '#1f4e79', line: '#06182b' },
+    forest:   { n: 'Forest',   ground: '#5aa06a', rock: '#2f5d3f', line: '#08150d' },
+    amethyst: { n: 'Amethyst', ground: '#9a6fd0', rock: '#4d2f86', line: '#120a26' },
+    sand:     { n: 'Sand',     ground: '#d8b878', rock: '#8a6a3a', line: '#1f160a' },
+    slate:    { n: 'Slate',    ground: '#7b8590', rock: '#3a424c', line: '#0d1014' },
+    rose:     { n: 'Rose',     ground: '#e07aa0', rock: '#8a3560', line: '#240a17' }
+  };
+  const isHex = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+  const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const rgb2hex = a => '#' + a.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('');
+  const mixHex = (a, b, t) => { const A = hex2rgb(a), C = hex2rgb(b); return rgb2hex(A.map((v, i) => v + (C[i] - v) * t)); };
+  const shade = (h, f) => f < 0 ? mixHex(h, '#000000', -f) : mixHex(h, '#ffffff', f);
+  const defColor = (name, fb) => { const v = getComputedStyle(document.body).getPropertyValue(name).trim(); return isHex(v) ? v : fb; };
+
+  let look = Object.assign({}, LOOK_DEFAULT);
+  try {
+    const raw = localStorage.getItem(LOOK_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      ['ground', 'rock', 'line'].forEach(k => { if (isHex(p[k])) look[k] = p[k]; });
+      if (typeof p.gap === 'number') look.gap = Math.max(0, Math.min(6, p.gap));
+    }
+  } catch (e) { /* storage unavailable */ }
+
+  function saveLook() { try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) { /* ignore */ } }
+
+  function applyLook() {
+    const st = $('#mapwrap').style;
+    ['--plain', '--plain2', '--ridge', '--crater', '--crater-in', '--gridline'].forEach(p => st.removeProperty(p));
+    if (look.ground) { st.setProperty('--plain', look.ground); st.setProperty('--plain2', shade(look.ground, -0.18)); }
+    if (look.rock) {
+      const base = look.ground || defColor('--plain', '#8a92c4');
+      const crater = mixHex(look.rock, base, 0.45);
+      st.setProperty('--ridge', look.rock); st.setProperty('--crater', crater); st.setProperty('--crater-in', shade(crater, -0.25));
+    }
+    if (look.line) st.setProperty('--gridline', look.line);
+    st.setProperty('--gap', look.gap + 'px');
+  }
+
+  function panelLook() {
+    const sw = Object.keys(PRESETS).map(k => {
+      const p = PRESETS[k];
+      return `<button class="sw" data-preset="${k}" style="--g:${p.ground};--r:${p.rock};--l:${p.line}"><i></i>${p.n}</button>`;
+    }).join('');
+    return `<div class="sect">Grid colors</div>` +
+      `<div class="lookrow"><label for="lkGround">Ground</label><input type="color" id="lkGround"></div>` +
+      `<div class="lookrow"><label for="lkRock">Ridges &amp; craters</label><input type="color" id="lkRock"></div>` +
+      `<div class="lookrow"><label for="lkLine">Grid lines</label><input type="color" id="lkLine"></div>` +
+      `<div class="lookrow"><label for="lkGap">Line thickness</label><span><input type="range" id="lkGap" min="0" max="6" step="1"> <output id="lkGapOut"></output></span></div>` +
+      `<div class="sect">Presets</div><div class="swatches">${sw}</div>` +
+      `<div class="row2" style="margin-top:10px"><button class="mini" data-look="reset">Reset to planet colors</button></div>` +
+      `<p class="muted" style="margin:10px 4px;font-size:12px">Ice and ore keep their signature colors so deposits stay easy to spot. Your choices are remembered on this device.</p>`;
+  }
+
+  function syncLook() {
+    const set = (id, v) => { const el = $('#' + id); if (el) el.value = v; };
+    set('lkGround', look.ground || defColor('--plain', '#8a92c4'));
+    set('lkRock', look.rock || defColor('--ridge', '#4b4f92'));
+    set('lkLine', look.line || '#06081a');
+    set('lkGap', look.gap);
+    const o = $('#lkGapOut'); if (o) o.textContent = look.gap + 'px';
+  }
+
   /* ---------------------------------------------------------------- save / load */
   function save() {
     try { if (S && (S.status === 'playing' || S.status === 'landing')) localStorage.setItem(SAVE_KEY, JSON.stringify(S)); else localStorage.removeItem(SAVE_KEY); } catch (e) { /* storage unavailable */ }
@@ -264,7 +331,7 @@
 
   /* ---------------------------------------------------------------- side panel */
   function renderTabs() {
-    const tabs = [['build', 'Build'], ['cargo', 'Cargo'], ['colony', 'Colony'], ['log', 'Log']];
+    const tabs = [['build', 'Build'], ['cargo', 'Cargo'], ['colony', 'Colony'], ['log', 'Log'], ['look', 'Grid']];
     setHTML($('#tabs'), tabs.map(([k, n]) => `<button data-tab="${k}" class="${ui.tab === k ? 'on' : ''}">${n}</button>`).join(''));
   }
 
@@ -321,10 +388,16 @@
   }
 
   function renderPanel() {
+    const panel = $('#panel');
+    // The Grid tab is built once so color pickers are not torn down by the game clock.
+    if (ui.tab === 'look') {
+      if (panel.dataset.look !== '1') { panel.innerHTML = panelLook(); panel._h = null; panel.dataset.look = '1'; syncLook(); }
+      return;
+    }
+    panel.dataset.look = '';
     let h = '';
     if (S.status === 'landing') h = '<div class="sect">Preparing landing</div><div class="ms">Pick a site on the map. Look for flat ground close to blue ice and amber ore.</div>';
     else h = { build: panelBuild, cargo: panelCargo, colony: panelColony, log: panelLog }[ui.tab]();
-    const panel = $('#panel');
     const top = panel.scrollTop;
     setHTML(panel, h);
     panel.scrollTop = top;
@@ -481,7 +554,20 @@
     $('#tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { ui.tab = b.dataset.tab; render(); } });
     $('#inspector').addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b) act(b.dataset.act, +b.dataset.id); });
 
+    $('#panel').addEventListener('input', e => {
+      const id = e.target.id, v = e.target.value;
+      if (id === 'lkGround') look.ground = v;
+      else if (id === 'lkRock') look.rock = v;
+      else if (id === 'lkLine') look.line = v;
+      else if (id === 'lkGap') { look.gap = +v; $('#lkGapOut').textContent = v + 'px'; }
+      else return;
+      applyLook(); saveLook();
+    });
+
     $('#panel').addEventListener('click', e => {
+      const pr = e.target.closest('[data-preset]'), lk = e.target.closest('[data-look]');
+      if (pr) { const p = PRESETS[pr.dataset.preset]; look.ground = p.ground; look.rock = p.rock; look.line = p.line; applyLook(); saveLook(); syncLook(); return; }
+      if (lk) { look = Object.assign({}, LOOK_DEFAULT); applyLook(); saveLook(); syncLook(); return; }
       const b = e.target.closest('[data-build]'), o = e.target.closest('[data-order]');
       if (b && S.status === 'playing') { ui.placing = ui.placing === b.dataset.build ? null : b.dataset.build; ui.sel = null; render(); }
       if (o && S.status === 'playing') {
@@ -518,5 +604,6 @@
   }
 
   wire();
+  applyLook();
   initStart();
 })();
