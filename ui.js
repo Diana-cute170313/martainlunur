@@ -7,6 +7,7 @@
   const SPEEDS = [0, 1600, 800, 320];
 
   let S = null, A = null, timer = null;
+  const drag = { cand: null, active: false, ghost: null, last: '' };
   const ui = { tab: 'build', placing: null, sel: null, hover: null, speed: 0, prevSpeed: 1, resume: 0, express: false, seenLog: 0, planet: 'moon', diff: 'hardened' };
 
   /* ---------------------------------------------------------------- icons (32x32, stroke = currentColor) */
@@ -105,7 +106,7 @@
       `<div class="lookrow"><label for="lkLine">Grid lines</label><input type="color" id="lkLine"></div>` +
       `<div class="lookrow"><label for="lkGap">Line thickness</label><span><input type="range" id="lkGap" min="0" max="6" step="1"> <output id="lkGapOut"></output></span></div>` +
       `<div class="sect">Presets</div><div class="swatches">${sw}</div>` +
-      `<div class="row2" style="margin-top:10px"><button class="mini" data-look="reset">Reset to planet colors</button></div>` +
+      `<div class="row2" style="margin-top:10px"><button class="mini" data-lookreset="1">Reset to planet colors</button></div>` +
       `<p class="muted" style="margin:10px 4px;font-size:12px">Ice and ore keep their signature colors so deposits stay easy to spot. Your choices are remembered on this device.</p>`;
   }
 
@@ -344,7 +345,8 @@
         `<span><b>${d.name}</b><small>${E.describe(k, S.planet).join(' · ')}${locked ? ` · needs crew of ${d.minPop}` : ''}</small></span>` +
         `<span class="cost"><span class="${shortM ? 'short' : 'm'}">${d.cost.m} mat</span><br><span class="${shortC ? 'short' : 'c'}">${d.cost.c} cr</span><br><small class="muted">${d.build}d build</small></span></button>`;
     }).join('');
-    return `<div class="sect">Modules — build within 2 tiles of an existing module</div>${cards}`;
+    return `<div class="sect">Modules — drag onto the map, or click then click a tile</div>` +
+      `<div class="ms">Must be within 2 tiles of an existing module.</div>${cards}`;
   }
 
   function panelCargo() {
@@ -391,12 +393,19 @@
     const panel = $('#panel');
     // The Grid tab is built once so color pickers are not torn down by the game clock.
     if (ui.tab === 'look') {
-      if (panel.dataset.look !== '1') { panel.innerHTML = panelLook(); panel._h = null; panel.dataset.look = '1'; syncLook(); }
+      if (!panel._isLook) { panel.innerHTML = panelLook(); panel._h = null; panel._isLook = true; syncLook(); }
       return;
     }
-    panel.dataset.look = '';
+    panel._isLook = false;
     let h = '';
-    if (S.status === 'landing') h = '<div class="sect">Preparing landing</div><div class="ms">Pick a site on the map. Look for flat ground close to blue ice and amber ore.</div>';
+    if (S.status === 'landing') {
+      const hub = B('hub');
+      h = '<div class="sect">Choose your landing site</div>' +
+        `<button class="card ${ui.placing === 'hub' ? 'active' : ''}" data-build="hub"><span class="ico" style="color:${hub.color}">${icon('hub')}</span>` +
+        `<span><b>${hub.name}</b><small>Houses 4 · stores 40 power. Drag it onto flat ground, or click a tile.</small></span>` +
+        `<span class="cost"><span class="m">free</span></span></button>` +
+        '<div class="ms">Look for flat ground close to blue ice and amber ore.</div>';
+    }
     else h = { build: panelBuild, cargo: panelCargo, colony: panelColony, log: panelLog }[ui.tab]();
     const top = panel.scrollTop;
     setHTML(panel, h);
@@ -456,7 +465,7 @@
   }
 
   /* ---------------------------------------------------------------- modals */
-  function modal(html) { const m = $('#modal'); m.innerHTML = html; m.hidden = false; }
+  function modal(html) { cancelDrag(); const m = $('#modal'); m.innerHTML = html; m.hidden = false; }
   function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; }
 
   function showEvent() {
@@ -516,6 +525,78 @@
     ui.sel = { x: p.x, y: p.y }; refresh();
   }
 
+  /* ---------------------------------------------------------------- drag a module onto the map */
+  function tileAtPoint(x, y) {
+    const el = document.elementFromPoint(x, y), t = el && el.closest && el.closest('.tile');
+    if (!t) return null;
+    const i = +t.dataset.i;
+    return { x: i % E.W, y: Math.floor(i / E.W) };
+  }
+
+  function dragCleanup() {
+    window.removeEventListener('pointermove', onDragMove);
+    window.removeEventListener('pointerup', onDragEnd);
+    window.removeEventListener('pointercancel', cancelDrag);
+    if (drag.ghost) drag.ghost.remove();
+    drag.ghost = null; drag.cand = null; drag.active = false; drag.last = '';
+    document.body.classList.remove('dragging');
+  }
+
+  function cancelDrag() {
+    const was = drag.active;
+    dragCleanup();
+    if (was && S) { ui.placing = S.status === 'landing' ? 'hub' : null; ui.hover = null; refresh(); }
+  }
+
+  function onDragStart(e) {
+    if (e.pointerType === 'touch' || e.button !== 0 || !S) return; // touch keeps tap-to-place so the panel can still scroll
+    const card = e.target.closest('[data-build]');
+    if (!card) return;
+    const type = card.dataset.build;
+    if (!(S.status === 'playing' || (S.status === 'landing' && type === 'hub'))) return;
+    drag.cand = { type, x: e.clientX, y: e.clientY };
+    window.addEventListener('pointermove', onDragMove);
+    window.addEventListener('pointerup', onDragEnd);
+    window.addEventListener('pointercancel', cancelDrag);
+  }
+
+  function onDragMove(e) {
+    if (!drag.cand) return;
+    if (!drag.active) {
+      if (Math.hypot(e.clientX - drag.cand.x, e.clientY - drag.cand.y) < 6) return;
+      drag.active = true; ui.placing = drag.cand.type; ui.sel = null;
+      const d = B(ui.placing), g = document.createElement('div');
+      g.id = 'dragghost';
+      g.innerHTML = `<div class="bld" style="--c:${d.color}">${icon(ui.placing)}</div><span class="dname">${d.name}</span>`;
+      document.body.appendChild(g);
+      drag.ghost = g;
+      document.body.classList.add('dragging');
+      render();
+    }
+    drag.ghost.style.left = e.clientX + 'px';
+    drag.ghost.style.top = e.clientY + 'px';
+    const p = tileAtPoint(e.clientX, e.clientY), key = p ? p.x + ',' + p.y : '';
+    if (key === drag.last) return;
+    drag.last = key;
+    ui.hover = p;
+    const c = p ? E.canPlace(S, ui.placing, p.x, p.y) : null;
+    drag.ghost.classList.toggle('ok', !!(c && c.ok));
+    drag.ghost.classList.toggle('bad', !!(c && !c.ok));
+    renderMap(); renderHint();
+  }
+
+  function onDragEnd(e) {
+    const wasActive = drag.active;
+    dragCleanup();
+    if (!wasActive) return; // a plain click: let the click handler deal with it
+    ui.justDragged = true; setTimeout(() => { ui.justDragged = false; }, 0);
+    const p = tileAtPoint(e.clientX, e.clientY);
+    if (p) clickTile(p, e.shiftKey);
+    if (S.status === 'playing' && !e.shiftKey) ui.placing = null;
+    ui.hover = null;
+    refresh();
+  }
+
   function act(name, id) {
     if (name === 'deselect') { ui.sel = null; }
     else if (name === 'toggle') E.toggle(S, id);
@@ -554,6 +635,7 @@
     $('#tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { ui.tab = b.dataset.tab; render(); } });
     $('#inspector').addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b) act(b.dataset.act, +b.dataset.id); });
 
+    $('#panel').addEventListener('pointerdown', onDragStart);
     $('#panel').addEventListener('input', e => {
       const id = e.target.id, v = e.target.value;
       if (id === 'lkGround') look.ground = v;
@@ -565,11 +647,14 @@
     });
 
     $('#panel').addEventListener('click', e => {
-      const pr = e.target.closest('[data-preset]'), lk = e.target.closest('[data-look]');
+      const pr = e.target.closest('[data-preset]'), lk = e.target.closest('[data-lookreset]');
       if (pr) { const p = PRESETS[pr.dataset.preset]; look.ground = p.ground; look.rock = p.rock; look.line = p.line; applyLook(); saveLook(); syncLook(); return; }
       if (lk) { look = Object.assign({}, LOOK_DEFAULT); applyLook(); saveLook(); syncLook(); return; }
       const b = e.target.closest('[data-build]'), o = e.target.closest('[data-order]');
-      if (b && S.status === 'playing') { ui.placing = ui.placing === b.dataset.build ? null : b.dataset.build; ui.sel = null; render(); }
+      if (b && !ui.justDragged) {
+        if (S.status === 'playing') { ui.placing = ui.placing === b.dataset.build ? null : b.dataset.build; ui.sel = null; render(); }
+        else if (S.status === 'landing') { ui.placing = 'hub'; render(); }
+      }
       if (o && S.status === 'playing') {
         const r = E.orderCargo(S, o.dataset.order, ui.express);
         if (!r.ok) toast(r.reason || 'Cannot order that', 'warn'); else toast(`${E.CARGO[o.dataset.order].name} ordered`, 'good');
@@ -594,6 +679,7 @@
     });
 
     document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && drag.cand) { cancelDrag(); return; }
       if (!S || $('#app').hidden || e.target.tagName === 'INPUT' || !$('#modal').hidden) return;
       if (e.key === 'Escape') { ui.placing = S.status === 'landing' ? 'hub' : null; ui.sel = null; refresh(); }
       else if (e.key === ' ') { e.preventDefault(); if (S.status === 'playing' && !S.pending) setSpeed(ui.speed ? 0 : ui.prevSpeed); }
