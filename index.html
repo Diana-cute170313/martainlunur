@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OUTPOST — Moon &amp; Mars Colony</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="moon">
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="brand">OUTPOST<small id="siteName"></small></div>
+    <div class="clock">
+      <div class="day" id="dayLabel"></div>
+      <div class="sky" id="skyLabel"></div>
+    </div>
+    <div class="controls">
+      <button class="ctl" data-speed="0" title="Pause (Space)">&#10074;&#10074;</button>
+      <button class="ctl" data-speed="1" title="Normal speed (1)">&#9654;</button>
+      <button class="ctl" data-speed="2" title="Fast (2)">&#9654;&#9654;</button>
+      <button class="ctl" data-speed="3" title="Faster (3)">&#9654;&#9654;&#9654;</button>
+      <button class="ctl step" id="stepBtn" title="Advance one day (N)">+1 day</button>
+      <button class="ctl ghost" id="helpBtn" title="How to play">?</button>
+      <button class="ctl ghost" id="menuBtn" title="Abandon mission / new game">&#8801;</button>
+    </div>
+  </header>
+
+  <section id="hud" class="hud"></section>
+  <section id="alerts" class="alerts"></section>
+
+  <main>
+    <div id="stage">
+      <div id="mapwrap">
+        <div id="map"></div>
+        <div id="sky" class="skyfx"></div>
+      </div>
+      <div id="hint" class="hint"></div>
+    </div>
+    <aside id="side">
+      <nav id="tabs" class="tabs"></nav>
+      <div id="inspector"></div>
+      <div id="panel"></div>
+    </aside>
+  </main>
+</div>
+
+<div id="start" class="overlay">
+  <div class="sheet start">
+    <h1>OUTPOST</h1>
+    <p class="lead">Build a permanent human settlement on another world. The vacuum doesn't care about your budget.</p>
+
+    <h3>Destination</h3>
+    <div class="choices" id="planetChoices">
+      <button class="pick" data-planet="moon">
+        <b>The Moon</b>
+        <span>Cargo in 4 days &middot; generous funding &middot; 15-day lunar nights &middot; scarce ice</span>
+      </button>
+      <button class="pick" data-planet="mars">
+        <b>Mars</b>
+        <span>Cargo in 16 days &middot; costly, unreliable launches &middot; plentiful ice &middot; dust storms</span>
+      </button>
+    </div>
+
+    <h3>Difficulty</h3>
+    <div class="choices three" id="diffChoices"></div>
+
+    <div class="row">
+      <label>Map seed <input id="seedInput" type="text" placeholder="random" maxlength="10" autocomplete="off"></label>
+      <span class="muted">Same seed + destination = same terrain and same disasters.</span>
+    </div>
+
+    <div class="row buttons">
+      <button class="big" id="startBtn">Launch mission</button>
+      <button class="big alt" id="continueBtn" hidden>Continue saved mission</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="overlay" hidden></div>
+<div id="toasts"></div>
+
+<script src="engine.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>
